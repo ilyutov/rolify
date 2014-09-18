@@ -24,15 +24,29 @@ module Rolify
 
     def has_role?(role_name, resource = nil)
       @r_map ||= {}
-      role_n_resource = role_name.to_s + resource.to_s
+      resource_key = resource.respond_to?(:id) && resource.id ? (resource.class.name + resource.id.to_s) : resource.to_s
+      role_n_resource = role_name.to_s + resource_key
       @r_map[role_n_resource].nil? ? @r_map[role_n_resource] = has_role_helper(role_name, resource) : @r_map[role_n_resource]
     end
 
     def has_role_helper(role_name, resource = nil)
-      if new_record?
-        self.roles.detect { |r| r.name == role_name.to_s && (r.resource == resource || resource.nil?) }.present?
-      else
-        self.class.adapter.where(self.roles, :name => role_name, :resource => resource).size > 0
+      self.roles.any? do |role|
+        if resource == :any
+          role.name == role_name.to_s
+        elsif resource.nil?
+          role.name == role_name.to_s && role.resource_type.nil? && role.resource_id.nil?
+        elsif resource.is_a?(Class)
+          role.name == role_name.to_s && (
+            role.resource_type.nil? || 
+            role.resource_type == resource.name && role.resource_id.nil?
+          )
+        else
+          role.name == role_name.to_s && (
+            role.resource_type.nil? || 
+            role.resource_type == resource.class.name && role.resource_id.nil? ||
+            role.resource_type == resource.class.name && role.resource_id == resource.id
+          )
+        end
       end
     end
 
